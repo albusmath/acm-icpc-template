@@ -1,121 +1,115 @@
-struct node_t {
-	node_t();
-	void update();
-	int dir() { return (this == p->ch[1]); }
-	void setc(node_t *c, int d) { ch[d] = c, c->p = this; }
-	node_t *p, *ch[2];
-	int size, cnt; // maintain tag from top to bottom (via find).
-} s[maxn], *nil = s, *root;
-node_t::node_t() { p = ch[0] = ch[1] = nil; }
+int ch[maxn][2], far[maxn], typ[maxn], sz[maxn], val[maxn], tot, root;
 
-void node_t::update() {
-	if (this == nil) return;
-	size = ch[0]->size + ch[1]->size + cnt;
+inline void upd(int x) {
+	if (!x) return ;
+	sz[x] = sz[ch[x][0]] + sz[ch[x][1]] + 1;
 }
 
-node_t *newNode(int cnt) {
-	++pt;
-	s[pt].cnt = cnt; s[pt].p = s[pt].ch[0] = s[pt].ch[1] = nil;
-	s[pt].update();
-	return &s[pt];
+inline void init() {
+	tot = 1;
+	root = 0;
 }
 
-void rotate(node_t *t) {
-	node_t *p = t->p;
-	p->p->update();
-	p->update();
-	t->update();
-	int d = t->dir();
-	p->p->setc(t, p->dir());
-	p->setc(t->ch[!d], d);
-	t->setc(p, !d);
-	if (p == root) root = t;
-	p->update(), t->update();
+inline int new_node() {
+	int x = tot++;
+	ch[x][0] = ch[x][1] = 0;
+	far[x] = 0; typ[x] = 0;
+	sz[x] = 1;
+	return x;
 }
 
-node_t *splay(node_t *t, node_t *dst = nil) {
-	while (t->p != dst) {
-		if (t->p->p == dst) rotate(t);
-		else if (t->dir() == t->p->dir()) rotate(t->p), rotate(t);
-		else rotate(t), rotate(t);
+inline void setc(int x, int c, int y) {
+	if (c < 2)
+		ch[x][c] = y;
+	else
+		root = y;
+	if (y) {
+		far[y] = x;
+		typ[y] = c;
 	}
-	t->update();
-	return t;
 }
 
-node_t *prev(node_t *p) {
-	splay(p);
-	p = p->ch[0], p->update();
-	while (p->ch[1] != nil) p = p->ch[1], p->update();
-	return p;
+inline void rot(int x)
+{
+	int y = far[x], c = typ[x];
+	//push_down(y);
+	//push_down(x);
+	setc(far[y], typ[y], x);
+	setc(y, c, ch[x][!c]);
+	setc(x, !c, y);
+	upd(y);
+	upd(x);
 }
 
-node_t *succ(node_t *p) {
-	splay(p);
-	p = p->ch[1], p->update();
-	while (p->ch[0] != nil) p = p->ch[0], p->update();
-	return p;
+void splay(int x, int f = -1)
+{
+	if (!x) return ;
+	while (far[x] != f) {
+		if (far[far[x]] == f)
+			rot(x);
+		else {
+			int y = far[x];
+			if (typ[x] == typ[y])
+				rot(y);
+			else
+				rot(x);
+			rot(x);
+		}
+	}
 }
 
-void insert(node_t *y, node_t *x) { // Insert node x after y
+inline void insert(int y, int x) // insert node x after y
+{
 	splay(y);
-	if (y->ch[1] == nil) {
-		y->ch[1] = x;
-		x->p = y;
-		y->update();
+	//push_down(y);
+	if (!ch[y][1]) {
+		setc(y, 1, x);
 	} else {
-		y = y->ch[1], y->update();
-		while (y->ch[0] != nil) y = y->ch[0], y->update();
-		y->ch[0] = x;
-		x->p = y;
-		y->update();
+		y = ch[y][1];
+		while (ch[y][0]) {
+			//push_down(y);
+			y = ch[y][0];
+		}
+		//push_down(y)
+		setc(y, 0, x);
 	}
 	splay(x);
 }
 
-void removeAll(node_t *x) { // Remove all the whole subtree of x
-	x->p->update();
-	x->p->ch[x->dir()] = nil;
-	x->p->update();
-	splay(x->p);
-	x->p = nil;
-}
-
-void remove(node_t *x) { // Remove the single node x
-	node_t *p = prev(x); node_t *s = succ(x);
-	splay(p);
-	splay(s, p);
-	removeAll(s->ch[0]);
-}
-
-node_t *find(node_t *t, int k) {
-	t->update();
-	if (t->ch[0]->size < k && t->ch[0]->size + t->cnt >= k) return t;
-	if (t->ch[0]->size >= k) return find(t->ch[0], k);
-	return find(t->ch[1], k - t->ch[0]->size - t->cnt);
-}
-
-node_t *findAndSplit(node_t *t, int k) {
-	t->update();
-	if (t->ch[0]->size < k && t->ch[0]->size + t->cnt >= k) {
-		int cnt = t->cnt;
-		k -= t->ch[0]->size;
-		t->cnt = 1;
-		splay(t);
-		node_t *p = prev(t);
-		if (k - 1) insert(p, newNode(k - 1));
-		if (cnt - k) insert(t, newNode(cnt - k));
-		return t;
+inline int find(int k) {
+	int x = root;
+	
+	while (x) {
+		//push_down(x);
+		if (k <= sz[ch[x][0]]) {
+			x = ch[x][0];
+		} else if (k == sz[ch[x][0]] + 1) {
+			splay(x);
+			return x;
+		} else {
+			k -= sz[ch[x][0]] + 1;
+			x = ch[x][1];
+		}
 	}
-	if (t->ch[0]->size >= k) return findAndSplit(t->ch[0], k);
-	return findAndSplit(t->ch[1], k - t->ch[0]->size - t->cnt);
+	return 0;
 }
 
-void init() {
-	pt = 0, nil->p = nil->ch[0] = nil->ch[1] = nil;
-}
-
-node_t *expose(node_t *x, node_t *y) {
-	x = prev(x), y = succ(y);
-	return splay(y, splay(x))->ch[0];
+inline void erase(int x) { //remove single node x
+	if (!x) return ;
+	splay(x);
+	//push_down(x);
+	if (ch[x][0] == 0) {
+		setc(far[x], typ[x], ch[x][1]);
+		return ;
+	}
+	int y = ch[x][0];
+	//push_down(y);
+	while (ch[y][1]) {
+		y = ch[y][1];
+		//push_down(y);
+	}
+	setc(y, 1, ch[x][1]);
+	setc(far[x], typ[x], ch[x][0]);
+	upd(y);
+	splay(y);
 }
